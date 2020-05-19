@@ -61,6 +61,7 @@ public final class SerialUnmarshaller extends AbstractUnmarshaller implements Un
     private final SerializableClassRegistry registry;
 
     private int depth = 0;
+    private long totalRefs = 0;
 
     private SerialObjectInputStream ois;
     private BlockUnmarshaller blockUnmarshaller;
@@ -117,6 +118,7 @@ public final class SerialUnmarshaller extends AbstractUnmarshaller implements Un
 
     Object doReadObject(int leadByte, final boolean unshared) throws IOException, ClassNotFoundException {
         depth ++;
+        totalRefs ++;
         try {
             final BlockUnmarshaller blockUnmarshaller = this.blockUnmarshaller;
             for (;;) switch (leadByte) {
@@ -165,6 +167,7 @@ public final class SerialUnmarshaller extends AbstractUnmarshaller implements Un
                     instanceCache.add(UNRESOLVED);
                     final int size = readInt();
                     final Class<?> type = descriptor.getType();
+                    filterCheck(type, size, depth, totalRefs, totalBytesRead);
                     if (! type.isArray()) {
                         throw new InvalidClassException(type.getName(), "Expected array type");
                     }
@@ -237,6 +240,7 @@ public final class SerialUnmarshaller extends AbstractUnmarshaller implements Un
                     } catch (ClassCastException e) {
                         throw new InvalidClassException("Expected an enum class descriptor");
                     }
+                    filterCheck(enumType, -1, depth, totalRefs, totalBytesRead);
                     final int idx = instanceCache.size();
                     instanceCache.add(UNRESOLVED);
                     final String constName = (String) doReadObject(false);
@@ -252,6 +256,7 @@ public final class SerialUnmarshaller extends AbstractUnmarshaller implements Un
                     final Object obj;
                     final int idx;
                     final Class<?> objClass = descriptor.getType();
+                    filterCheck(objClass, -1, depth, totalRefs, totalBytesRead);
                     final SerializableClass sc = registry.lookup(objClass);
                     if ((descriptor.getFlags() & SC_EXTERNALIZABLE) != 0) {
                         if (sc.hasObjectInputConstructor()) {
